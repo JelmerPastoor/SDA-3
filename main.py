@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
-
 data = astropy.io.ascii.read('./ZTF_flares.dat') # data from of van Velzen et al. 2019
 # print(data)
 # print(len(data))
@@ -20,13 +19,14 @@ def histogram(data, label, title, xlabel, ylabel):
     plt.show()
 
 
-# def P_nuclear(r, sigma_xy):
-#     integrand_func = lambda r: (np.sqrt(2 * np.pi) * r * np.random.normal(0, sigma_xy)) / sigma_xy
-#     P_nuc, _ = sp.quad(integrand_func, 0, r)
-#     return P_nuc
 def P_nuclear(r, sigma_xy):
     P_nuc = (np.sqrt(2 * np.pi) * r * sp.stats.norm.pdf(r, loc = 0, scale = sigma_xy)) / sigma_xy
     return P_nuc
+
+# def integrate_pnuc(r):
+#     integrand_func = lambda r: P_nuclear(r, sigma_xy_guess)
+#     P_nuc, _ = sp.quad(integrand_func, 0, r)
+#     return P_nuc
 
 AGN_sources = []
 AGN_sources_indices = []
@@ -47,21 +47,21 @@ for source in data['classification']:
         Unknown_sources.append(source)
         Unknown_sources_indices.append(i)
     i += 1
-# print(len(data[AGN_sources_indices]) + len(data[Unknown_sources_indices]) + len(data[SN_sources_indices]))
+
+# - Plot the offset distribution of the SN, AGN and unknown sources. Discuss the following two points:
+#   - Describe the difference between the SN and nuclear flare offset distribution.
 AGN = data[AGN_sources_indices]
 SNe = data[SN_sources_indices]
 Unknown = data[Unknown_sources_indices]
 hist_stack_data = [AGN['offset_mean'], SNe['offset_mean'], Unknown['offset_mean']]
 stack_label = ['AGN', 'SNe', 'Unknown']
-# plt.figure()
-# plt.title('Mean offset distribution for different objects')
-# plt.hist(hist_stack_data, bins='auto', label = stack_label, stacked = True, edgecolor = 'black')
-# plt.xlabel('Mean offset [arcsec]')
-# plt.ylabel('Number of counts')
-# plt.legend()
-# plt.show()
-# - Plot the offset distribution of the SN, AGN and unknown sources. Discuss the following two points:
-#   - Describe the difference between the SN and nuclear flare offset distribution.
+plt.figure()
+plt.title('Mean offset distribution for different objects')
+plt.hist(hist_stack_data, bins='auto', label = stack_label, stacked = True, edgecolor = 'black')
+plt.xlabel('Mean offset [arcsec]')
+plt.ylabel('Number of counts')
+plt.legend()
+plt.show()
 # histogram(data['offset_mean'][SN_sources_indices], 'Supernovae', 'Distribution of offset of supernovae',  'Offset [arcsec]', 'Number of SNe')
 # histogram(data['offset_mean'][Unknown_sources_indices], 'Unknown objects', 'Distribution of offset of different unknown objects',  'Offset [arcsec]', 'Number of objects')
 # histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of offset of AGN',  'Offset [arcsec]', 'Number of AGN')
@@ -72,7 +72,6 @@ print(f'We can use a hypothesis that reads: The offset distribution of the unkno
 AGN_unknown_pvalue = sp.stats.anderson_ksamp([AGN['offset_mean'], Unknown['offset_mean']])
 print(f'We can use a hypothesis that reads: The offset distribution of the unknown sources is consistent with originating solely from the AGN offset distribution. Using the Anderson Darling test, we find that this results in a p value of {AGN_unknown_pvalue[2]:.3f}, which is lower than 0.05, so we can reject this hypothesis.')
 
-# Function for Pnuc
 x_dist = np.random.normal(0, 1, 1000)
 y_dist = np.random.normal(0, 1, 1000)
 r = np.sqrt(x_dist ** 2 + y_dist ** 2)
@@ -86,8 +85,28 @@ plt.legend()
 plt.show()
 
 # - Use the PDF $P_{\rm nuc}$ to obtain a measurement of $\sigma_{xy}$ for the sample of AGN flares. Plot the result and comment on the result:
-
-
+plt.figure()
+AGN_hist, bins = np.histogram(AGN['offset_mean'], density = True)
+bin_center = [(bins[i] + bins[i + 1]) / 2 for i in range(len(bins) - 1)]
+sigma_xy_guess, pcov = sp.optimize.curve_fit(P_nuclear, bin_center, AGN_hist)
+print(sigma_xy_guess)
+# histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of offset of AGN',  'Offset [arcsec]', 'Number of AGN')
+plt.figure()
+plt.hist(AGN['offset_mean'], label = 'Active Galactic Nuclei', density = True, bins = 'auto')
+plt.plot(r_values, P_nuclear(r_values, sigma_xy_guess))
+plt.xlabel('Offset [arcsec]')
+plt.xlim(0, 0.8)
+plt.ylabel('WORK IN PROGRESS')
+plt.title('Optimized sigma value for AGN flares')
+plt.legend()
+plt.show()
 #     - Does your inference of $\sigma_{xy}$ match what you expected based on the typical sample variance in the position measurements?
+expected_var = np.var(AGN['offset_mean'])
+print(expected_var, 'DEZE IS NOG NIET GOED') #DEZE HEB IK NOG NIET HELUP
 #     - What is the uncertainty on your measurement of $\sigma_{xy}$?
+std_sigmaxy = np.sqrt(np.diag(pcov))
+print(std_sigmaxy)
 #     - Compute $r_{90}$, the value of $r$ below which we find all nuclear transients: $\int_0^{r_{90}} P_{\rm nuc} dr \equiv 0.9$.
+
+# integrand_func = lambda r: P_nuclear(r, sigma_xy_guess)
+# P_nuc, _ = sp.integrate.quad(integrand_func, 0, r)
