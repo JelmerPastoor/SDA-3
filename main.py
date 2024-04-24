@@ -3,6 +3,7 @@ import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
 import warnings
+import tqdm
 warnings.filterwarnings("ignore")
 
 data = astropy.io.ascii.read('./ZTF_flares.dat') # data from of van Velzen et al. 2019
@@ -18,15 +19,25 @@ def histogram(data, label, title, xlabel, ylabel):
     plt.legend()
     plt.show()
 
-
 def P_nuclear(r, sigma_xy):
+    """
+    The function for P$_{nuclear}$ which gives the distribution of the nuclear transients
+    :param r: The distance from the origin (list/array)
+    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
+    :return: The function that gives the probability distribution of nuclear transients
+    """
     P_nuc = (np.sqrt(2 * np.pi) * r * sp.stats.norm.pdf(r, loc = 0, scale = sigma_xy)) / sigma_xy
     return P_nuc
 
-# def integrate_pnuc(r):
-#     integrand_func = lambda r: P_nuclear(r, sigma_xy_guess)
-#     P_nuc, _ = sp.quad(integrand_func, 0, r)
-#     return P_nuc
+def integrate_pnuc(r90, sigma_xy):
+    """
+    :param r90:
+    :param sigma_xy:
+    :return: Returns the integrated function of
+    """
+    integrand_func = lambda r: P_nuclear(r, sigma_xy)
+    P_nuc, _ = sp.integrate.quad(integrand_func, a = 0, b = r90)
+    return P_nuc
 
 AGN_sources = []
 AGN_sources_indices = []
@@ -36,7 +47,7 @@ Unknown_sources = []
 Unknown_sources_indices = []
 
 i = 0
-for source in data['classification']:
+for source in data['classification']: #This for loop finds the different sources and divides them into 3 different lists
     if source == 'AGN':
         AGN_sources.append(source)
         AGN_sources_indices.append(i)
@@ -107,6 +118,35 @@ print(expected_var, 'DEZE IS NOG NIET GOED') #DEZE HEB IK NOG NIET HELUP
 std_sigmaxy = np.sqrt(np.diag(pcov))
 print(std_sigmaxy)
 #     - Compute $r_{90}$, the value of $r$ below which we find all nuclear transients: $\int_0^{r_{90}} P_{\rm nuc} dr \equiv 0.9$.
+# value_guesses = [0.5, sigma_xy_guess]
+# r90, errors = sp.optimize.curve_fit(integrate_pnuc, xdata = bin_center, ydata = AGN_hist)
+# print(r90)
 
-# integrand_func = lambda r: P_nuclear(r, sigma_xy_guess)
-# P_nuc, _ = sp.integrate.quad(integrand_func, 0, r)
+def find_boundary(func, lower, upper, target, tol):
+    """
+    Find the boundary value for a definite integral with an already known result
+    :param func: The function to integrate (function)
+    :param lower: The lower limit of integration (float)
+    :param upper: The initial guess for the upper limit of integration (float)
+    :param target: The result of the integral (float)
+    :param tol: The tolerance for the difference between the integral and the target (float)
+    :return: The found upper limit of integration (float)
+    """
+    def integral(x):
+        return sp.integrate.quad(func, lower, x, args = sigma_xy_guess)[0] - target
+    r90 = sp.optimize.brentq(integral, lower, upper, xtol=tol)
+    return r90
+r90 = find_boundary(P_nuclear, 0, 0.5, 0.9, 1e-30)
+print(sp.integrate.quad(P_nuclear, 0, r90, args = sigma_xy_guess)[0])
+
+SN_KDE = sp.stats.gaussian_kde(SNe['offset_mean'], bw_method = 0.4)
+print(SN_KDE)
+plt.figure()
+plt.hist(SNe['offset_mean'], label = 'Supernovae', density = True, bins = 'auto')
+plt.plot(r_values, SN_KDE(r_values), label = 'Gaussian KDE SNe')
+plt.xlabel('Offset [arcsec]')
+plt.ylabel('Probability density')
+plt.xlim(0, 1)
+plt.title('Estimation of PDF of offset distribution of Supernovae')
+plt.legend()
+plt.show()
