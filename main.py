@@ -3,7 +3,7 @@ import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
 import warnings
-import tqdm
+from tqdm import tqdm
 warnings.filterwarnings("ignore")
 
 data = astropy.io.ascii.read('./ZTF_flares.dat') # data from of van Velzen et al. 2019
@@ -140,7 +140,6 @@ r90 = find_boundary(P_nuclear, 0, 0.5, 0.9, 1e-30)
 print(sp.integrate.quad(P_nuclear, 0, r90, args = sigma_xy_guess)[0])
 
 SN_KDE = sp.stats.gaussian_kde(SNe['offset_mean'], bw_method = 0.4)
-print(SN_KDE)
 plt.figure()
 plt.hist(SNe['offset_mean'], label = 'Supernovae', density = True, bins = 'auto')
 plt.plot(r_values, SN_KDE(r_values), label = 'Gaussian KDE SNe')
@@ -150,3 +149,33 @@ plt.xlim(0, 1)
 plt.title('Estimation of PDF of offset distribution of Supernovae')
 plt.legend()
 plt.show()
+
+def unknown_distribution(f_nuc, r, sigma_xy):
+    """
+    The function that gives the PDF of the unknown distribution of unknown objects
+    :param f_nuc: The fraction of nuclear transients in this population (function)
+    :param r: The distance from the origin (list/array)
+    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
+    :return: The PDF of the unknown distribution of unknown objects
+    """
+    Nuclear_transient_part = f_nuc * P_nuclear(r, sigma_xy)
+    SN_part = (1 - f_nuc) * SN_KDE(r)
+    return Nuclear_transient_part + SN_part
+
+logli_results = []
+def logli_unknowndist(f_nuc, r, sigma_xy):
+    """
+    Calculates the log likelihood of an unknown object
+    :param f_nuc: The fraction of nuclear transients in this population (function)
+    :param r: The distance from the origin (list/array)
+    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
+    :return: The log likelihood of the unknown object
+    """
+    return np.sum(np.log(unknown_distribution(f_nuc, r, sigma_xy)))
+r_values = np.linspace(0, 0.8, 1000)
+f_nuc_values = np.linspace(0, 1, 1000)
+for i in tqdm(range(len(f_nuc_values))):
+    logli_results.append(logli_unknowndist(f_nuc_values[i], r_values, sigma_xy_guess))
+print(logli_results)
+print(np.max(logli_results), np.argmax(logli_results))
+
