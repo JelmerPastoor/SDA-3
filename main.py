@@ -4,9 +4,10 @@ import scipy as sp
 from matplotlib import pyplot as plt
 import warnings
 from tqdm import tqdm
+
 warnings.filterwarnings("ignore")
 
-data = astropy.io.ascii.read('./ZTF_flares.dat') # data from of van Velzen et al. 2019
+data = astropy.io.ascii.read('./ZTF_flares.dat')  # data from of van Velzen et al. 2019
 # print(data)
 # print(len(data))
 # print('# unknown sources', sum(data['classification']=='None'))
@@ -20,12 +21,13 @@ def histogram(data, label, title, xlabel, ylabel):
     :param ylabel: Label of the y-axis (string)
     """
     plt.figure()
-    plt.hist(data, bins='auto', label = label, edgecolor = 'black')
+    plt.hist(data, bins='auto', label=label, edgecolor='black')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
     plt.legend()
     plt.show()
+
 
 def P_nuclear(r, sigma_xy):
     """
@@ -34,8 +36,10 @@ def P_nuclear(r, sigma_xy):
     :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
     :return: The function that gives the probability distribution of nuclear transients
     """
-    P_nuc = (np.sqrt(2 * np.pi) * r * sp.stats.norm.pdf(r, loc = 0, scale = sigma_xy)) / sigma_xy
+    P_nuc = (np.sqrt(2 * np.pi) * r * sp.stats.norm.pdf(r, loc=0, scale=sigma_xy)) / sigma_xy
     return P_nuc
+
+
 def log_likelihood(r, sigma_xy, f_nuc = None):
     """
     Calculates the log likelihood of the specified mode
@@ -68,7 +72,7 @@ Unknown_sources = []
 Unknown_sources_indices = []
 
 i = 0
-for source in data['classification']: #This for loop finds the different sources and divides them into 3 different lists
+for source in data['classification']:  #This for loop finds the different sources and divides them into 3 different lists
     if source == 'AGN':
         AGN_sources.append(source)
         AGN_sources_indices.append(i)
@@ -89,7 +93,7 @@ hist_stack_data = [AGN['offset_mean'], SNe['offset_mean'], Unknown['offset_mean'
 stack_label = ['AGN', 'SNe', 'Unknown']
 plt.figure()
 plt.title('Mean offset distribution for different objects')
-plt.hist(hist_stack_data, bins='auto', label = stack_label, stacked = True, edgecolor = 'black')
+plt.hist(hist_stack_data, bins='auto', label=stack_label, stacked=True, edgecolor='black')
 plt.xlabel('Mean offset [arcsec]')
 plt.ylabel('Number of counts')
 plt.legend()
@@ -111,7 +115,7 @@ r = np.sqrt(x_dist ** 2 + y_dist ** 2)
 r_values_sim = np.linspace(0, 4, 1000)
 plt.figure()
 plt.hist(r, density = True, label = 'Simulated data')
-plt.plot(r_values_sim, P_nuclear(r_values_sim, 1), label = r'P$_{nuc}$')
+plt.plot(r_values_sim, P_nuclear(r_values_sim, 1), label=r'P$_{nuc}$')
 plt.xlabel('r')
 plt.ylabel('Probability density')
 plt.legend()
@@ -127,22 +131,22 @@ sigma_xy_logli_max, sigma_xy_best = np.max(sigma_logli), sigmas[np.argmax(sigma_
 print(sigma_xy_best)
 print(f'The maximum log likelihood of this distribution is {sigma_xy_logli_max:.3f}, the corresponding value for f_nuc is {sigma_xy_best:.3f}.')
 plt.figure()
-plt.scatter(sigma_xy_best, sigma_xy_logli_max, c = 'red', label = rf'$\sigma_{{xy}}$ = {sigma_xy_best:.3f}')
-plt.plot(sigmas, sigma_logli, label = 'Log likelihood of AGN')
+plt.scatter(sigma_xy_best, sigma_xy_logli_max, c='red', label=rf'$\sigma_{{xy}}$ = {sigma_xy_best:.3f}')
+plt.plot(sigmas, sigma_logli, label='Log likelihood of AGN')
 plt.title('Log likelihood of unknown objects')
 plt.xlabel(r'Values for $\sigma_{xy}$')
 plt.ylabel('Log likelihood')
 plt.legend()
 plt.show()
 
-AGN_hist, bins = np.histogram(AGN['offset_mean'], density = True)
+AGN_hist, bins = np.histogram(AGN['offset_mean'], density=True)
 bin_center = [(bins[i] + bins[i + 1]) / 2 for i in range(len(bins) - 1)]
 sigma_xy_guess, pcov = sp.optimize.curve_fit(P_nuclear, bin_center, AGN_hist)
 print(sigma_xy_guess)
 # histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of offset of AGN',  'Offset [arcsec]', 'Number of AGN')
 r_values = np.linspace(0, 0.8, 1000)
 plt.figure()
-plt.hist(AGN['offset_mean'], label = 'Active Galactic Nuclei', density = True, bins = 'auto')
+plt.hist(AGN['offset_mean'], label='Active Galactic Nuclei', density=True, bins='auto')
 plt.plot(r_values, P_nuclear(r_values, sigma_xy_best))
 plt.xlabel('Offset [arcsec]')
 plt.xlim(0, 0.8)
@@ -152,27 +156,29 @@ plt.legend()
 plt.show()
 #     - Does your inference of $\sigma_{xy}$ match what you expected based on the typical sample variance in the position measurements?
 expected_var = np.var(AGN['offset_mean'])
-print(expected_var, 'DEZE IS NOG NIET GOED') #DEZE HEB IK NOG NIET HELUP
+print(expected_var, 'DEZE IS NOG NIET GOED')  #DEZE HEB IK NOG NIET HELUP
 #     - What is the uncertainty on your measurement of $\sigma_{xy}$?
 std_sigmaxy = np.sqrt(np.diag(pcov))
 print(std_sigmaxy)
 #     - Compute $r_{90}$, the value of $r$ below which we find all nuclear transients: $\int_0^{r_{90}} P_{\rm nuc} dr \equiv 0.9$.
 P_nuc_int = []
 for i in range(len(r_values)):
-    P_nuc_int.append(sp.integrate.quad(P_nuclear, 0, r_values[i], args = sigma_xy_best)[0])
+    P_nuc_int.append(sp.integrate.quad(P_nuclear, 0, r_values[i], args=sigma_xy_best)[0])
 interp_r90 = np.interp(0.9, P_nuc_int, r_values)
-print(f'The value for r_90 for which the integral over all nuclear transients is equal to 0.9 is r_90 = {interp_r90}')
+print(f'The value for r_90 for which the integral over all nuclear transients is equal to 0.9 is r_90 = {interp_r90:.3f}')
 
 # - To estimate the PDF for the offset distribution of SN, we a Gaussian Kernel Density Estimation (KDE; as discussed in the lecture of week 5).
-SN_KDE = sp.stats.gaussian_kde(SNe['offset_mean'], bw_method = 0.4)
+SN_KDE = sp.stats.gaussian_kde(SNe['offset_mean'])
 plt.figure()
-plt.hist(SNe['offset_mean'], label = 'Supernovae', density = True, bins = 'auto')
-plt.plot(r_values, SN_KDE(r_values), label = 'Gaussian KDE SNe')
+plt.hist(SNe['offset_mean'], label='Supernovae', density=True, bins='auto')
+plt.plot(r_values, SN_KDE(r_values), label='Gaussian KDE SNe')
 plt.xlabel('Offset [arcsec]')
 plt.ylabel('Probability density')
 plt.title('Estimation of PDF of offset distribution of Supernovae')
 plt.legend()
 plt.show()
+
+
 # - In the previous two steps, you obtained two PDFs: one for SN and one for nuclear transients. The offset distribution of transients with an unknown classification must originate from one of these two PDFs. You can therefore write own a final PDF for the unknown distribution:
 def unknown_distribution(f_nuc, r, sigma_xy):
     """
@@ -187,6 +193,7 @@ def unknown_distribution(f_nuc, r, sigma_xy):
     Unknown_dist = Nuclear_transient_part + SN_part
     return Unknown_dist
 
+
 # Finding the value for f_nuc through the use of the log likelihood
 f_nuc_logli = []
 f_nuc_values = np.linspace(0, 1, 1000)
@@ -196,8 +203,8 @@ f_nuc_logli_max, f_nuc = np.max(f_nuc_logli), f_nuc_values[np.argmax(f_nuc_logli
 print(f'The maximum log likelihood of this distribution is {f_nuc_logli_max:.3f}, the corresponding value for f_nuc is {f_nuc:.3f}.')
 
 plt.figure()
-plt.scatter(f_nuc, f_nuc_logli_max, c = 'red', label = rf'f$_{{nuc}}$ = {f_nuc:.3f}')
-plt.plot(f_nuc_values, f_nuc_logli, label = 'Log likelihood of unknown objects')
+plt.scatter(f_nuc, f_nuc_logli_max, c='red', label=rf'f$_{{nuc}}$ = {f_nuc:.3f}')
+plt.plot(f_nuc_values, f_nuc_logli, label='Log likelihood of unknown objects')
 plt.title('Log likelihood of unknown objects')
 plt.xlabel(r'Values for f$_{\mathrm{nuc}}$')
 plt.ylabel('Log likelihood')
@@ -205,9 +212,12 @@ plt.legend()
 plt.show()
 
 plt.figure()
-plt.plot(r_values, unknown_distribution(f_nuc, r_values, sigma_xy_best), label = 'Distribution of unknown objects')
-plt.plot(r_values, SN_KDE(r_values), label = 'Estimated distribution of supernovae')
-plt.plot(r_values, P_nuclear(r_values, sigma_xy_best), label = 'Distribution of AGN')
+plt.plot(r_values, unknown_distribution(f_nuc, r_values, sigma_xy_best), label = 'Distribution of unknown objects', c = '#1f77b4')
+plt.plot(r_values, SN_KDE(r_values), label = 'Estimated distribution of supernovae', c = '#2ca02c')
+plt.plot(r_values, P_nuclear(r_values, sigma_xy_best), label = 'Distribution of AGN', c = '#d62728')
+plt.hist(Unknown['offset_mean'], color = '#6baed6', alpha = 0.6, density = True, label = 'Distribution of unknown objects')
+plt.hist(SNe['offset_mean'], color = '#98df8a', alpha = 0.6, density = True, label = 'Distribution of Supernovae')
+plt.hist(AGN['offset_mean'], color = '#ff9896', alpha = 0.6, density = True, label = 'Distribution of AGN')
 plt.xlabel('Mean offset [arcsec]')
 plt.ylabel('Probability density')
 plt.title('WIP')
