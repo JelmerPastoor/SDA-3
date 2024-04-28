@@ -21,11 +21,12 @@ def histogram(data, label, title, xlabel, ylabel):
     :param ylabel: Label of the y-axis (string)
     """
     plt.figure()
-    plt.hist(data, bins='auto', label=label, edgecolor='black')
+    plt.hist(data, bins = 'auto', label = label)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
     plt.legend()
+    plt.savefig(title + '.pdf')
     plt.show()
 
 
@@ -53,16 +54,18 @@ def log_likelihood(r, sigma_xy, f_nuc = None):
     else:
         return np.sum(np.log(unknown_distribution(f_nuc, r, sigma_xy)))
 
-
-# def integrate_pnuc(r, r90, sigma_xy):
-#     """
-#     :param r90:
-#     :param sigma_xy:
-#     :return: Returns the integrated function of
-#     """
-#     integrand_func = lambda r: P_nuclear(r, sigma_xy)
-#     P_nuc, _ = sp.integrate.quad(integrand_func, a = 0, b = r90)
-#     return P_nuc
+def unknown_distribution(f_nuc, r, sigma_xy):
+    """
+    The function that gives the PDF of the unknown distribution of unknown objects
+    :param f_nuc: The fraction of nuclear transients in this population (function)
+    :param r: The distance from the origin (list/array)
+    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
+    :return: The PDF of the unknown distribution of unknown objects
+    """
+    Nuclear_transient_part = f_nuc * P_nuclear(r, sigma_xy)
+    SN_part = (1 - f_nuc) * SN_KDE(r)
+    Unknown_dist = Nuclear_transient_part + SN_part
+    return Unknown_dist
 
 AGN_sources = []
 AGN_sources_indices = []
@@ -89,14 +92,15 @@ for source in data['classification']:  #This for loop finds the different source
 AGN = data[AGN_sources_indices]
 SNe = data[SN_sources_indices]
 Unknown = data[Unknown_sources_indices]
-hist_stack_data = [AGN['offset_mean'], SNe['offset_mean'], Unknown['offset_mean']]
-stack_label = ['AGN', 'SNe', 'Unknown']
+hist_stack_data = [AGN['offset_mean'], Unknown['offset_mean'], SNe['offset_mean']]
+stack_label = ['AGN', 'Unknown', 'SNe']
 plt.figure()
 plt.title('Mean offset distribution for different objects')
-plt.hist(hist_stack_data, bins='auto', label=stack_label, stacked=True, edgecolor='black')
+plt.hist(hist_stack_data, bins = 'auto', label = stack_label, stacked = True, edgecolor = 'black')
 plt.xlabel('Mean offset [arcsec]')
 plt.ylabel('Number of counts')
 plt.legend()
+plt.savefig('Mean offset distribution.pdf')
 plt.show()
 # histogram(data['offset_mean'][SN_sources_indices], 'Supernovae', 'Distribution of offset of supernovae',  'Offset [arcsec]', 'Number of SNe')
 # histogram(data['offset_mean'][Unknown_sources_indices], 'Unknown objects', 'Distribution of offset of different unknown objects',  'Offset [arcsec]', 'Number of objects')
@@ -126,23 +130,19 @@ sigma_logli = []
 sigmas = np.linspace(1e-30, 1, 1000)
 for i in range(len(sigmas)):
     sigma_logli.append(log_likelihood(AGN['offset_mean'], sigmas[i]))
-print(sigma_logli)
 sigma_xy_logli_max, sigma_xy_best = np.max(sigma_logli), sigmas[np.argmax(sigma_logli)]
 print(sigma_xy_best)
-print(f'The maximum log likelihood of this distribution is {sigma_xy_logli_max:.3f}, the corresponding value for f_nuc is {sigma_xy_best:.3f}.')
+print(f'The maximum log likelihood of this distribution is {sigma_xy_logli_max:.3f}, the corresponding value for sigma_xy is {sigma_xy_best:.3f}.')
 plt.figure()
 plt.scatter(sigma_xy_best, sigma_xy_logli_max, c='red', label=rf'$\sigma_{{xy}}$ = {sigma_xy_best:.3f}')
 plt.plot(sigmas, sigma_logli, label='Log likelihood of AGN')
-plt.title('Log likelihood of unknown objects')
+plt.title(r'Optimization of $\sigma_{xy}$ for AGN Distribution')
 plt.xlabel(r'Values for $\sigma_{xy}$')
 plt.ylabel('Log likelihood')
 plt.legend()
+plt.savefig('Optimization of sigma for AGN Distribution.pdf')
 plt.show()
 
-AGN_hist, bins = np.histogram(AGN['offset_mean'], density=True)
-bin_center = [(bins[i] + bins[i + 1]) / 2 for i in range(len(bins) - 1)]
-sigma_xy_guess, pcov = sp.optimize.curve_fit(P_nuclear, bin_center, AGN_hist)
-print(sigma_xy_guess)
 # histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of offset of AGN',  'Offset [arcsec]', 'Number of AGN')
 r_values = np.linspace(0, 0.8, 1000)
 plt.figure()
@@ -155,11 +155,25 @@ plt.title('Optimized sigma value for AGN flares')
 plt.legend()
 plt.show()
 #     - Does your inference of $\sigma_{xy}$ match what you expected based on the typical sample variance in the position measurements?
+# sample_var = []
+# variance = np.linspace(0, 1, 1000)
+# for i in range(len(sigmas)):
+#     sigma_logli.append(log_likelihood(AGN['offset_mean'], variance[i]))
+# sigma_xy_logli_max, sigma_xy_best = np.max(sigma_logli), sigmas[np.argmax(sigma_logli)]
+# print(sigma_xy_best)
+
+
 expected_var = np.var(AGN['offset_mean'])
 print(expected_var, 'DEZE IS NOG NIET GOED')  #DEZE HEB IK NOG NIET HELUP
 #     - What is the uncertainty on your measurement of $\sigma_{xy}$?
-std_sigmaxy = np.sqrt(np.diag(pcov))
-print(std_sigmaxy)
+max_index = np.argmax(sigma_logli)
+sigma_logli = np.array(sigma_logli)
+lower_bound = np.interp(sigma_logli[max_index] - 0.5, sigma_logli[:max_index], sigmas[:max_index])
+upper_bound = np.interp(0.5 - sigma_logli[max_index], -sigma_logli[(max_index + 1):], sigmas[(max_index + 1):])
+print(rf'The lowest value of the interval of sigma by making use of the 68% confidence interval is {lower_bound:.3f}, the highest value of this interval is {upper_bound:.3f}. Therefore, the uncertainty on sigma_xy is {np.abs(lower_bound - upper_bound):.3f}')
+# print(f'The true value of tau does fall in this interval. This is to be expected, as the interval is calculated by making use of the maximum tau value.')
+
+
 #     - Compute $r_{90}$, the value of $r$ below which we find all nuclear transients: $\int_0^{r_{90}} P_{\rm nuc} dr \equiv 0.9$.
 P_nuc_int = []
 for i in range(len(r_values)):
@@ -180,18 +194,7 @@ plt.show()
 
 
 # - In the previous two steps, you obtained two PDFs: one for SN and one for nuclear transients. The offset distribution of transients with an unknown classification must originate from one of these two PDFs. You can therefore write own a final PDF for the unknown distribution:
-def unknown_distribution(f_nuc, r, sigma_xy):
-    """
-    The function that gives the PDF of the unknown distribution of unknown objects
-    :param f_nuc: The fraction of nuclear transients in this population (function)
-    :param r: The distance from the origin (list/array)
-    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
-    :return: The PDF of the unknown distribution of unknown objects
-    """
-    Nuclear_transient_part = f_nuc * P_nuclear(r, sigma_xy)
-    SN_part = (1 - f_nuc) * SN_KDE(r)
-    Unknown_dist = Nuclear_transient_part + SN_part
-    return Unknown_dist
+
 
 
 # Finding the value for f_nuc through the use of the log likelihood
@@ -202,6 +205,7 @@ for i in range(len(f_nuc_values)):
 f_nuc_logli_max, f_nuc = np.max(f_nuc_logli), f_nuc_values[np.argmax(f_nuc_logli)]
 print(f'The maximum log likelihood of this distribution is {f_nuc_logli_max:.3f}, the corresponding value for f_nuc is {f_nuc:.3f}.')
 
+# - With $f_{\rm nuc}$ measured, you can estimate the number of SNe and nuclear flares as a function $r$. Make a nice summary figure (example was given on  blackboard during the lecture). In the report, give the fraction of SNe for $r_{90}$.
 plt.figure()
 plt.scatter(f_nuc, f_nuc_logli_max, c='red', label=rf'f$_{{nuc}}$ = {f_nuc:.3f}')
 plt.plot(f_nuc_values, f_nuc_logli, label='Log likelihood of unknown objects')
@@ -212,16 +216,17 @@ plt.legend()
 plt.show()
 
 plt.figure()
-plt.plot(r_values, unknown_distribution(f_nuc, r_values, sigma_xy_best), label = 'Distribution of unknown objects', c = '#1f77b4')
+plt.plot(r_values, unknown_distribution(f_nuc, r_values, sigma_xy_best), label = 'Estimated distribution of unknown objects', c = '#1f77b4')
 plt.plot(r_values, SN_KDE(r_values), label = 'Estimated distribution of supernovae', c = '#2ca02c')
-plt.plot(r_values, P_nuclear(r_values, sigma_xy_best), label = 'Distribution of AGN', c = '#d62728')
+plt.plot(r_values, P_nuclear(r_values, sigma_xy_best), label = 'Estimated distribution of AGN', c = '#d62728')
 plt.hist(Unknown['offset_mean'], color = '#6baed6', alpha = 0.6, density = True, label = 'Distribution of unknown objects')
 plt.hist(SNe['offset_mean'], color = '#98df8a', alpha = 0.6, density = True, label = 'Distribution of Supernovae')
 plt.hist(AGN['offset_mean'], color = '#ff9896', alpha = 0.6, density = True, label = 'Distribution of AGN')
 plt.xlabel('Mean offset [arcsec]')
 plt.ylabel('Probability density')
-plt.title('WIP')
+plt.title('Mean Offset Distributions of AGN, Supernovae, and Unknown Objects')
 plt.legend()
+plt.savefig('Mean Offset Distributions of objects.pdf')
 plt.show()
 
 plt.figure()
@@ -231,3 +236,33 @@ plt.xlabel('Mean offset [arcsec]')
 plt.ylabel('Probability density')
 plt.title('WIP')
 plt.show()
+
+SNe_offset = SNe['offset_mean']
+SNe_before_r90 = 0
+for i in range(len(SNe['offset_mean'])):
+    if SNe['offset_mean'][i] <= interp_r90:
+        SNe_before_r90 += 1
+print(f'{SNe_before_r90 / len(SNe_offset)}')
+
+# - Instead of fitting for $\sigma_{xy}$ you can predict the distribution of nuclear flares with zero free parameters using the sample variance of the R.A. and Decl. measurements. Does this yield a better or worse description of the AGN offset distribution compared to using $\sigma_{\rm xy}$ as a free parameter?
+
+f_nuc_values_2fit = np.linspace(0, 1, 500)
+sigma_values_2fit = np.linspace(0, 1, 500)
+r_values = np.linspace(0, 0.8, 500)
+# - Keeping $\sigma_{xy}$ fixed for the fit of the offset distribution of the unknown sources might slightly underestimate the uncertainty on $f_{\rm nuc}$ (explain why). Instead, you can also fit for the two free parameters simultaneously, using the offset distribution of all unknown sources. How does your inference of $f_{\rm nuc}$ change when you use this approach?
+# def loglikelihood_2params(r, sigma_xy, f_nuc):
+#     best_fnuc_fit = None
+#     best_sigma_fit = None
+#     best_likelihood = -np.inf
+#     for fnuc in tqdm(f_nuc_values_2fit, 'F_nuc loop'):
+#         for sigma_xy in sigma_values_2fit:
+#             loglikelihood = np.sum(np.log(unknown_distribution(fnuc, r_values, sigma_xy)))
+#             if loglikelihood > best_likelihood:
+#                 best_fnuc_fit = fnuc
+#                 best_sigma_fit = sigma_xy
+#                 best_likelihood = loglikelihood
+#     return best_likelihood, best_sigma_fit, best_fnuc_fit
+# print(loglikelihood_2params(r_values, sigma_values_2fit, f_nuc_values_2fit))
+best_likelihood_2fit = 40.21097493227965
+best_sigma_fit_2fit = 0.028056112224448895
+best_fnuc_fit_2fit = 0.03406813627254509
