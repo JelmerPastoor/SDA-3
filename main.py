@@ -3,28 +3,35 @@ import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
 import warnings
-from tqdm import tqdm
+from mpl_toolkits.mplot3d import Axes3D
 
 warnings.filterwarnings("ignore")
 
-data = astropy.io.ascii.read('./ZTF_flares.dat')  # data from of van Velzen et al. 2019
+data = astropy.io.ascii.read('ZTF_flares.dat')  # data from of van Velzen et al. 2019
 # print(data)
 # print(len(data))
 # print('# unknown sources', sum(data['classification']=='None'))
 def histogram(data, label, title, xlabel, ylabel):
     """
-    Creates a histogram of the data that is inputted into the definition.
-    :param data: The inputted data of which a histogram should be created (list/array)
-    :param label: Label of the plotted data (string)
-    :param title: Title of the plot (string)
-    :param xlabel: Label of the x-axis (string)
-    :param ylabel: Label of the y-axis (string)
+    Creates a histogram of the given data.
+    :param data: The inputted data of which a histogram should be created
+    :type data: np.ndarray or list
+    :param label: Label of the plotted data
+    :type label: string
+    :param title: Title of the plot
+    :type title: string
+    :param xlabel: Label of the x-axis
+    :type xlabel: string
+    :param ylabel: Label of the y-axis
+    :type ylabel: string
     """
     plt.figure(figsize=(7, 5))
     plt.hist(data, bins = 'auto', label = label)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
+    plt.xlim(0, 0.8)
+    plt.ylim(0, 50)
     plt.legend()
     plt.savefig(title + '.pdf')
     plt.show()
@@ -33,9 +40,12 @@ def histogram(data, label, title, xlabel, ylabel):
 def P_nuclear(r, sigma_xy):
     """
     The function for P$_{nuclear}$ which gives the distribution of the nuclear transients
-    :param r: The distance from the origin (list/array)
-    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
-    :return: The function that gives the probability distribution of nuclear transients
+    :param r: The distance from the origin
+    :type r: np.ndarray or list
+    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate
+    :type sigma_xy: int or float
+    :return: The probability distribution function of nuclear transients
+    :rtype: np.ndarray or float
     """
     P_nuc = (np.sqrt(2 * np.pi) * r * sp.stats.norm.pdf(r, loc=0, scale=sigma_xy)) / sigma_xy
     return P_nuc
@@ -44,10 +54,14 @@ def P_nuclear(r, sigma_xy):
 def log_likelihood(r, sigma_xy, f_nuc = None):
     """
     Calculates the log likelihood of the specified mode
-    :param r: The distance from the origin (list/array)
-    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
-    :param f_nuc: The fraction of nuclear transients in this population (function, optional)
-    :return: The log likelihood of the specified mode (float)
+    :param r: The distance from the origin
+    :type r: np.ndarray or list
+    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate
+    :type sigma_xy: int or float
+    :param f_nuc: The fraction of nuclear transients in this population
+    :type f_nuc: int or float or None
+    :return: The log likelihood of the specified mode
+    :rtype: int or float
     """
     if f_nuc is None:
         return np.sum(np.log(P_nuclear(r, sigma_xy)))
@@ -57,15 +71,44 @@ def log_likelihood(r, sigma_xy, f_nuc = None):
 def unknown_distribution(f_nuc, r, sigma_xy):
     """
     The function that gives the PDF of the unknown distribution of unknown objects
-    :param f_nuc: The fraction of nuclear transients in this population (function)
-    :param r: The distance from the origin (list/array)
-    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate (float)
+    :param f_nuc: The fraction of nuclear transients in this population
+    :type f_nuc: int or float
+    :param r: The distance from the origin
+    :type r: np.ndarray or list
+    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate
+    :type sigma_xy: int or float
     :return: The PDF of the unknown distribution of unknown objects
+    :rtype: np.ndarray or float
     """
     Nuclear_transient_part = f_nuc * P_nuclear(r, sigma_xy)
     SN_part = (1 - f_nuc) * SN_KDE(r)
     Unknown_dist = Nuclear_transient_part + SN_part
     return Unknown_dist
+
+def loglikelihood_2params(r, sigma_xy, f_nuc):
+    """"
+    Calculates the log likelihood while fitting for 2 parameters, fnuc and sigma_xy.
+    :param r: The distance from the origin
+    :type r: np.ndarray or list
+    :param sigma_xy: The typical uncertainty on the position of the x and or y coordinate
+    :type sigma_xy: int or float
+    :param f_nuc: The fraction of nuclear transients in this population
+    :type f_nuc: int or float
+    :return: The best values for the log likelihood, sigma_xy and f_nuc
+    :rtype: int or float
+    """
+    best_fnuc_fit = None
+    best_sigma_fit = None
+    best_likelihood = -np.inf
+    for fnuc in f_nuc_values_2fit:
+        for sigma_xy in sigma_values_2fit:
+            loglikelihood = np.sum(np.log(unknown_distribution(fnuc, r, sigma_xy)))
+            if loglikelihood > best_likelihood:
+                best_fnuc_fit = fnuc
+                best_sigma_fit = sigma_xy
+                best_likelihood = loglikelihood
+    return best_likelihood, best_sigma_fit, best_fnuc_fit
+
 
 AGN_sources = []
 AGN_sources_indices = []
@@ -101,11 +144,12 @@ plt.hist(hist_stack_data, bins = 'auto', label = stack_label, stacked = True, ed
 plt.xlabel('Mean offset [arcsec]')
 plt.ylabel('Number of counts')
 plt.legend()
+plt.xlim(0, 0.8)
 plt.savefig('Mean offset distribution.pdf')
 plt.show()
-# histogram(data['offset_mean'][SN_sources_indices], 'Supernovae', 'Distribution of offset of supernovae',  'Offset [arcsec]', 'Number of SNe')
-# histogram(data['offset_mean'][Unknown_sources_indices], 'Unknown objects', 'Distribution of offset of different unknown objects',  'Offset [arcsec]', 'Number of objects')
-# histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of offset of AGN',  'Offset [arcsec]', 'Number of AGN')
+histogram(data['offset_mean'][SN_sources_indices], 'Supernovae', 'Distribution of offset of supernovae',  'Offset [arcsec]', 'Number of SNe')
+histogram(data['offset_mean'][Unknown_sources_indices], 'Unknown objects', 'Distribution of offset of different unknown objects',  'Offset [arcsec]', 'Number of unknown objects')
+histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of offset of AGN',  'Offset [arcsec]', 'Number of AGN')
 
 #   - Is the offset distribution of the unknown sources consistent with originating solely from the SN offset distribution? Or solely from the AGN offset distribution? (hint: there is a statistical test to quantify this)
 SNe_unknown_pvalue = sp.stats.anderson_ksamp([SNe['offset_mean'], Unknown['offset_mean']])
@@ -140,6 +184,7 @@ plt.plot(sigmas, sigma_logli, label='Log likelihood of AGN')
 plt.title(r'Optimization of $\sigma_{xy}$ for AGN Distribution')
 plt.xlabel(r'Values for $\sigma_{xy}$')
 plt.ylabel('Log likelihood')
+plt.xlim(0, 1)
 plt.legend()
 # plt.savefig('Optimization of sigma for AGN Distribution.pdf')
 plt.show()
@@ -191,6 +236,7 @@ plt.plot(r_values, SN_KDE(r_values), label='Gaussian KDE SNe')
 plt.xlabel('Offset [arcsec]')
 plt.ylabel(r'Probability density [arcsec$^{-1}$]')
 plt.title('Estimation of PDF of offset distribution of Supernovae')
+plt.xlim(0, 0.8)
 plt.legend()
 plt.show()
 
@@ -223,7 +269,7 @@ plt.title(r'Optimization of $f_{{nuc}}$ for unknown distribution')
 plt.xlabel(r'Values for f$_{\mathrm{nuc}}$')
 plt.ylabel('Log likelihood')
 plt.legend()
-plt.savefig('fnuc log likelihood.pdf')
+#plt.savefig('fnuc log likelihood.pdf')
 plt.show()
 
 plt.figure()
@@ -235,44 +281,35 @@ plt.hist(SNe['offset_mean'], color = '#98df8a', alpha = 0.6, density = True, lab
 plt.hist(AGN['offset_mean'], color = '#ff9896', alpha = 0.6, density = True, label = 'Distribution of AGN')
 plt.xlabel('Mean offset [arcsec]')
 plt.ylabel(r'Probability density [arcsec$^{-1}$]')
-plt.title('Mean Offset Distributions of AGN, Supernovae, and Unknown Objects')
+plt.title('Comparison of Mean Offset Distributions and PDFs of \n AGN, Supernovae and Unknown Objects')
+plt.xlim(0, 0.8)
 plt.legend()
-plt.savefig('Mean Offset Distributions of objects.pdf')
+# plt.savefig('Mean Offset Distributions of objects.pdf')
 plt.show()
 
-# plt.figure()
-# plt.plot(r_values, unknown_distribution(f_nuc, r_values, sigma_xy_best), label = 'Distribution of unknown objects')
-# plt.hist(Unknown['offset_mean'], bins = 'auto', density = True)
-# plt.xlabel('Mean offset [arcsec]')
-# plt.ylabel('PDF')
-# plt.title('')
-# plt.show()
-
 SNe_offset = SNe['offset_mean']
-SN_r90 = SN_KDE(interp_r90)
+SN_r90 = SN_KDE(interp_r90)[0]
 Unknown_r90 = unknown_distribution(f_nuc, interp_r90, sigma_xy_best)[0]
-print(f'The fraction of supernovae at the distance of {interp_r90:.3f} is {((1 - f_nuc) * SN_KDE(interp_r90)) / Unknown_r90}')
+fraction_r90_SNe_unknown = (((1 - f_nuc) * SN_KDE(interp_r90)) / Unknown_r90)[0]
+print(f'The fraction of supernovae at the distance of {interp_r90:.3f}" is {fraction_r90_SNe_unknown:.3f}. Therefore, the fraction of TDEs at the distance of {interp_r90:.3f}" is {(1 - fraction_r90_SNe_unknown):.3f}.')
 
-
-# - Instead of fitting for $\sigma_{xy}$ you can predict the distribution of nuclear flares with zero free parameters using the sample variance of the R.A. and Decl. measurements. Does this yield a better or worse description of the AGN offset distribution compared to using $\sigma_{\rm xy}$ as a free parameter?
-
-f_nuc_values_2fit = np.linspace(0, 1, 50)
-sigma_values_2fit = np.linspace(0, 1, 50)
-r_values = np.linspace(0, 0.8, 50)
 # - Keeping $\sigma_{xy}$ fixed for the fit of the offset distribution of the unknown sources might slightly underestimate the uncertainty on $f_{\rm nuc}$ (explain why). Instead, you can also fit for the two free parameters simultaneously, using the offset distribution of all unknown sources. How does your inference of $f_{\rm nuc}$ change when you use this approach?
-# def loglikelihood_2params(r, sigma_xy, f_nuc):
-#     best_fnuc_fit = None
-#     best_sigma_fit = None
-#     best_likelihood = -np.inf
-#     for fnuc in tqdm(f_nuc_values_2fit, 'F_nuc loop'):
-#         for sigma_xy in sigma_values_2fit:
-#             loglikelihood = np.sum(np.log(unknown_distribution(fnuc, r_values, sigma_xy)))
-#             if loglikelihood > best_likelihood:
-#                 best_fnuc_fit = fnuc
-#                 best_sigma_fit = sigma_xy
-#                 best_likelihood = loglikelihood
-#     return best_likelihood, best_sigma_fit, best_fnuc_fit
-# print(loglikelihood_2params(r_values, sigma_values_2fit, f_nuc_values_2fit))
-# best_likelihood_2fit = 40.21097493227965
-# best_sigma_fit_2fit = 0.028056112224448895
-# best_fnuc_fit_2fit = 0.03406813627254509
+f_nuc_values_2fit = np.linspace(0, 1, 500)
+sigma_values_2fit = np.linspace(0, 1, 500)
+# best_likelihood_2fit, best_sigma_2fit, best_fnuc_2fit = loglikelihood_2params(Unknown['offset_mean'], sigma_values_2fit, f_nuc_values_2fit) # This is how the function loglikelihood_2params would be ran.
+# The use of loglikelihood_2params is commented out, since (for the amount of values it has to check for sigma and fnuc) it takes >10 minutes to run. The best values can be found in the variables below.
+best_likelihood_2fit = 68.17475524499142
+best_sigma_2fit = 0.16633266533066132
+best_fnuc_2fit = 0.44088176352705405
+
+plt.figure()
+plt.plot(r_values, unknown_distribution(best_fnuc_2fit, r_values, best_sigma_2fit), label = 'Two parameter fit')
+plt.plot(r_values, unknown_distribution(f_nuc, r_values, sigma_xy_best), label = 'One parameter fit', linestyle = '--', c = '#1f77b4')
+plt.hist(Unknown['offset_mean'], label = 'Distribution of unknown objects', density = True, color = '#6baed6', alpha = 0.6,)
+plt.ylabel(r'Probability density [arcsec$^{-1}$]')
+plt.xlabel('Mean offset [arcsec]')
+plt.xlim(0, 0.8)
+plt.title('Comparison of one and two parameter fit for \n mean offset distributions of Unknown Objects')
+plt.legend()
+# plt.savefig('one vs two fit parameters.pdf')
+plt.show()
