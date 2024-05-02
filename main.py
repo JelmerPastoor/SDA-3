@@ -29,7 +29,7 @@ def histogram(data, label, title, xlabel, ylabel):
     plt.xlim(0, 0.8)
     plt.ylim(0, 50)
     plt.legend()
-    # plt.savefig(title + '.pdf')
+    plt.savefig(title + '.pdf')
     plt.show()
 
 
@@ -68,9 +68,9 @@ def unknown_distribution(f_nuc, r, sigma_xy):
     """
     The function that gives the PDF of the unknown distribution of unknown objects
     :param r: The distance from the origin
-    :type r: np.ndarray or list
+    :type r: np.ndarray or list or int or float
     :param sigma_xy: Possible values for the typical uncertainty on the position of the x and or y coordinate
-    :type sigma_xy: np.ndarray or list
+    :type sigma_xy: np.ndarray or list or float or int
     :param f_nuc: Possible values for the fraction of nuclear transients in this population
     :type f_nuc: np.ndarray or list
     :return: The PDF of the unknown distribution of unknown objects
@@ -147,9 +147,9 @@ plt.legend()
 plt.xlim(0, 0.8)
 plt.savefig('Mean offset distribution.pdf')
 plt.show()
-histogram(data['offset_mean'][SN_sources_indices], 'Supernovae', 'Distribution of offset of supernovae',  'Offset [arcsec]', 'Number of SNe')
-histogram(data['offset_mean'][Unknown_sources_indices], 'Unknown objects', 'Distribution of offset of different unknown objects',  'Offset [arcsec]', 'Number of unknown objects')
-histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of offset of AGN',  'Offset [arcsec]', 'Number of AGN')
+histogram(data['offset_mean'][SN_sources_indices], 'Supernovae', 'Distribution of mean offset of supernovae',  'Offset [arcsec]', 'Number of SNe')
+histogram(data['offset_mean'][Unknown_sources_indices], 'Unknown objects', 'Distribution of mean offset of different unknown objects',  'Offset [arcsec]', 'Number of unknown events')
+histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of mean offset of AGN',  'Offset [arcsec]', 'Number of AGN')
 
 ####################
 #   - Is the offset distribution of the unknown sources consistent with originating solely from the SN offset distribution? Or solely from the AGN offset distribution? (hint: there is a statistical test to quantify this)
@@ -234,7 +234,6 @@ for r in r_values:
 interp_r90 = np.interp(0.9, P_nuc_int, r_values)
 print(f'The value for r_90 for which we find 90% of all nuclear transients is r_90 = {interp_r90:.3f}')
 
-
 ####################
 # - To estimate the PDF for the offset distribution of SN, we a Gaussian Kernel Density Estimation (KDE; as discussed in the lecture of week 5).
 ####################
@@ -283,7 +282,7 @@ plt.figure()
 plt.plot(r_values, unknown_distribution(f_nuc, r_values, sigma_xy_best), label = 'Estimated distribution of unknown objects', c = '#1f77b4', linestyle = '-')
 plt.plot(r_values, SN_KDE(r_values), label = 'Estimated distribution of supernovae', c = '#2ca02c', linestyle = '--')
 plt.plot(r_values, P_nuclear(r_values, sigma_xy_best), label = 'Estimated distribution of AGN', c = '#d62728', linestyle = '-.')
-plt.hist(Unknown['offset_mean'], color = '#6baed6', alpha = 0.6, density = True, label = 'Distribution of unknown objects')
+plt.hist(Unknown['offset_mean'], color = '#6baed6', alpha = 0.6, density = True, label = 'Distribution of unknown events')
 plt.hist(SNe['offset_mean'], color = '#98df8a', alpha = 0.6, density = True, label = 'Distribution of Supernovae')
 plt.hist(AGN['offset_mean'], color = '#ff9896', alpha = 0.6, density = True, label = 'Distribution of AGN')
 plt.xlabel('Mean offset [arcsec]')
@@ -317,7 +316,7 @@ llh_values = np.nan_to_num(np.load('llh_values.npy'))
 plt.figure()
 plt.plot(r_values, unknown_distribution(best_fnuc_2fit, r_values, best_sigma_2fit), label = 'Two parameter fit')
 plt.plot(r_values, unknown_distribution(f_nuc, r_values, sigma_xy_best), label = 'One parameter fit', linestyle = '--', c = '#1f77b4')
-plt.hist(Unknown['offset_mean'], label = 'Distribution of unknown objects', density = True, color = '#6baed6', alpha = 0.6,)
+plt.hist(Unknown['offset_mean'], label = 'Distribution of unknown events', density = True, color = '#6baed6', alpha = 0.6,)
 plt.ylabel(r'Probability density [arcsec$^{-1}$]')
 plt.xlabel('Mean offset [arcsec]')
 plt.xlim(0, 0.8)
@@ -332,9 +331,11 @@ upper_bound_fnuc_2fit = np.interp(0.5 - best_likelihood_2fit, -llh_values[(max_i
 print(rf'The lowest value of the interval of f_nuc by making use of the 68% confidence interval is {lower_bound_fnuc_2fit:.3f}, the highest value of this interval is {upper_bound_fnuc_2fit:.3f}.')
 lower_error_fnuc_2fit = best_fnuc_2fit - lower_bound_fnuc_2fit
 upper_error_fnuc_2fit = upper_bound_fnuc_2fit - best_fnuc_2fit
+print(f'The upper error on the simultaneously fitted f_nuc is {upper_error_fnuc_2fit:.3f}, the lower error on f_nuc is {lower_error_fnuc_2fit:.3f}.')
 
 lower_bound_sigma_2fit = np.interp(best_likelihood_2fit - 0.5, llh_values[max_index_2fit[0], :max_index_2fit[1]], sigma_values_2fit[:max_index_2fit[1]])
 upper_bound_sigma_2fit = np.interp(0.5 - best_likelihood_2fit, -llh_values[max_index_2fit[0], (max_index_2fit[1] + 1):], sigma_values_2fit[(max_index_2fit[1] + 1):])
 print(rf'The lowest value of the interval of sigma_xy by making use of the 68% confidence interval is {lower_bound_sigma_2fit:.3f}, the highest value of this interval is {upper_bound_sigma_2fit:.3f}.')
 lower_error_sigma_2fit = best_sigma_2fit - lower_bound_sigma_2fit
 upper_error_sigma_2fit = upper_bound_sigma_2fit - best_sigma_2fit
+print(f'The upper error on the simultaneously fitted sigma_xy is {upper_error_sigma_2fit:.3f}, the lower error on f_nuc is {lower_error_sigma_2fit:.3f}.')
