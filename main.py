@@ -29,7 +29,6 @@ def histogram(data, label, title, xlabel, ylabel):
     plt.xlim(0, 0.8)
     plt.ylim(0, 50)
     plt.legend()
-    plt.savefig(title + '.pdf')
     plt.show()
 
 
@@ -145,11 +144,10 @@ plt.xlabel('Mean offset [arcsec]')
 plt.ylabel('Number of counts')
 plt.legend()
 plt.xlim(0, 0.8)
-plt.savefig('Mean offset distribution.pdf')
 plt.show()
-histogram(data['offset_mean'][SN_sources_indices], 'Supernovae', 'Distribution of mean offset of supernovae',  'Offset [arcsec]', 'Number of SNe')
-histogram(data['offset_mean'][Unknown_sources_indices], 'Unknown objects', 'Distribution of mean offset of different unknown objects',  'Offset [arcsec]', 'Number of unknown events')
-histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of mean offset of AGN',  'Offset [arcsec]', 'Number of AGN')
+histogram(data['offset_mean'][SN_sources_indices], 'Supernovae', 'Distribution of mean offset of supernovae',  'Mean offset [arcsec]', 'Number of SNe')
+histogram(data['offset_mean'][Unknown_sources_indices], 'Unknown objects', 'Distribution of mean offset of different unknown objects',  'Mean offset [arcsec]', 'Number of unknown events')
+histogram(data['offset_mean'][AGN_sources_indices], 'Active Galactic Nuclei', 'Distribution of mean offset of AGN',  'Mean offset [arcsec]', 'Number of AGN')
 
 ####################
 #   - Is the offset distribution of the unknown sources consistent with originating solely from the SN offset distribution? Or solely from the AGN offset distribution? (hint: there is a statistical test to quantify this)
@@ -192,7 +190,6 @@ plt.xlabel(r'Values for $\sigma_{xy}$')
 plt.ylabel('Log likelihood')
 plt.xlim(0, 1)
 plt.legend()
-plt.savefig('Optimization of sigma for AGN Distribution.pdf')
 plt.show()
 
 r_values = np.linspace(0, 0.8, 1000)
